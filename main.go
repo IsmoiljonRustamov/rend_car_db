@@ -13,7 +13,7 @@ const (
 	PostgresPort     = 5432
 	PostgresUser     = "ismoiljon12"
 	PostgresPassword = "12"
-	PostgresDatabase = "rend_migration_db"
+	PostgresDatabase = "rend_car"
 )
 
 type Response struct {
@@ -74,7 +74,8 @@ func main() {
 	}
 
 	defer db.Close()
-	InsertDatabase(db)
+	of_id,br_id,car_id := InsertDatabase(db)
+	UpdateInfo(of_id,br_id,car_id,db)
 
 }
 
@@ -159,5 +160,86 @@ func InsertDatabase(db *sql.DB) (int, int, int) {
 		log.Println("Failed to commit: ", err)
 	}
 	return OfficeId, branchId, carId
+
+}
+
+func UpdateInfo(officeId, branchId, carId int, db *sql.DB) {
+	car := &Offices{
+		Name: "Rend_car",
+		Branch: []Branches{
+			{
+				officeId: 2,
+				Name:     "Shahar",
+				Car: []Car{
+					{
+						BranchId: 2,
+						Name:     "Gentra",
+						Color:    "dark black",
+						CostDay:  9500.22,
+						Amount:   200,
+						Customer: []Customer{
+							{
+								CarId:        2,
+								Name:         "Abdukarim",
+								Age:          28,
+								Phone_number: "+99893 545 78 87",
+								Address:      "Toshkent, Yunusobod",
+							},
+						},
+					},
+				},
+				Address: []Address{
+					{
+						BranchId: 2,
+						Street:   "Qodiriy street",
+						City:     "Toshkent",
+					},
+				},
+			},
+		},
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		log.Println("Failed to begin transaction", err)
+	}
+
+	_, err = tx.Exec("UPDATE offices SET name=$1 WHERE id=$2", car.Name, officeId)
+	if err != nil {
+		tx.Rollback()
+		log.Println("Failed to update offices", err)
+	}
+
+	for _, branch := range car.Branch {
+		_, err := tx.Exec("UPDATE branches SET name=$1 WHERE office_id=$2", branch.Name, officeId)
+		if err != nil {
+			tx.Rollback()
+			log.Println("Failed to Update branches: ", err)
+		}
+
+		for _, car := range branch.Car {
+			_, err := tx.Exec("UPDATE cars SET name=$1,color=$2,cost_day=$3,amount=$4 WHERE branch_id=$5", car.Name, car.Color, car.CostDay, car.Amount, branchId)
+			if err != nil {
+				tx.Rollback()
+				log.Println("Failed to update cars: ", err)
+			}
+
+			for _, customer := range car.Customer {
+				_, err := tx.Exec("UPDATE customer SET name=$1,age=$2,phone_number=$3,address=$4 WHERE car_id=$5", customer.Name, customer.Age, customer.Phone_number, customer.Address, carId)
+				if err != nil {
+					tx.Rollback()
+					log.Println("Failed to udate customer: ", err)
+				}
+			}
+		}
+
+		for _, address := range branch.Address {
+			_, err := tx.Exec("UPDATE address SET street=$1,city=$2 WHERE branch_id=$3", address.Street, address.City, branchId)
+			if err != nil {
+				tx.Rollback()
+				log.Println("Failed to update address:", err)
+			}
+		}
+	}
 
 }
