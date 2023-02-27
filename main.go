@@ -13,7 +13,7 @@ const (
 	PostgresPort     = 5432
 	PostgresUser     = "ismoiljon12"
 	PostgresPassword = "12"
-	PostgresDatabase = "rend_car"
+	PostgresDatabase = "rend_migration_db"
 )
 
 type Response struct {
@@ -113,9 +113,6 @@ func InsertDatabase(db *sql.DB) (int, int, int) {
 			},
 		},
 	}
-	var responseO Offices
-	var responseB Branches
-	var responseC Car
 	tx, err := db.Begin()
 	if err != nil {
 		log.Println("Failed to begin:", err)
@@ -128,19 +125,19 @@ func InsertDatabase(db *sql.DB) (int, int, int) {
 	}
 
 	for _, branch := range car.Branch {
-		err = tx.QueryRow("INSERT INTO branches(office_id,name) VALUES($1,$2) RETURNING id", responseO.Id, branch.Name).Scan(&branchId)
+		err = tx.QueryRow("INSERT INTO branches(office_id,name) VALUES($1,$2) RETURNING id", OfficeId, branch.Name).Scan(&branchId)
 		if err != nil {
 			tx.Rollback()
 			log.Println("Failed to insert branches:", err)
 		}
 		for _, car := range branch.Car {
-			err = tx.QueryRow("INSERT INTO cars(branch_id,name,color,cost_day,amount) VALUES($1,$2,$3,$4,$5) RETURNING id", responseB.Id, car.Name, car.Color, car.CostDay, car.Amount).Scan(&carId)
+			err = tx.QueryRow("INSERT INTO cars(branch_id,name,color,cost_day,amount) VALUES($1,$2,$3,$4,$5) RETURNING id", branchId, car.Name, car.Color, car.CostDay, car.Amount).Scan(&carId)
 			if err != nil {
 				tx.Rollback()
 				log.Println("Failed to insert cars: ", err)
 			}
 			for _, customer := range car.Customer {
-				_, err = tx.Exec("INSERT INTO customer(car_id,name,age,phone_number,address) VALUES($1,$2,$3,$4,$5)", responseC.Id, customer.Name, customer.Age, customer.Phone_number, customer.Address)
+				_, err = tx.Exec("INSERT INTO customer(car_id,name,age,phone_number,address) VALUES($1,$2,$3,$4,$5)", carId, customer.Name, customer.Age, customer.Phone_number, customer.Address)
 				if err != nil {
 					tx.Rollback()
 					log.Println("Failed to insert customers: ", err)
@@ -148,7 +145,7 @@ func InsertDatabase(db *sql.DB) (int, int, int) {
 			}
 		}
 		for _, addres := range branch.Address {
-			_, err = tx.Exec("INSERT INTO address(branch_id,street,city) VALUES($1,$2,$3)", responseB.Id, addres.Street, addres.City)
+			_, err = tx.Exec("INSERT INTO address(branch_id,street,city) VALUES($1,$2,$3)", branchId, addres.Street, addres.City)
 			if err != nil {
 				tx.Rollback()
 				log.Println("Failed to insert address: ", err)
